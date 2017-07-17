@@ -23,10 +23,10 @@ var (
 )
 
 const (
-	ERROR_NOT_AUTHORIZED   = "Login não autorizado."
-	ERROR_NOT_LOGGED_IN    = "Login não efetuado."
-	ERROR_METHOD_NOT_FOUND = "Método não encontrado."
-	ERROR_METHOD_EXECUTION = "Problema ao executar o método."
+	ERROR_NOT_AUTHORIZED   = "Login not authorized."
+	ERROR_NOT_LOGGED_IN    = "Not logged in."
+	ERROR_METHOD_NOT_FOUND = "Method not found."
+	ERROR_METHOD_EXECUTION = "Problem to execute method."
 	ERROR_UNMARSHALLING    = "Problem to parse JSON"
 )
 
