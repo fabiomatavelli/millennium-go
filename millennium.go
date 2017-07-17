@@ -70,6 +70,27 @@ func Login(hostname string, username string, password string, ssl bool) (bool, e
 	return true, nil
 }
 
+// Logout from Millennium
+func Logout() (bool, error) {
+	if wts_session == "" {
+		return false, errors.New(ERROR_NOT_LOGGED_IN)
+	}
+
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/logout", api_url), nil)
+	req.Header.Set("WTS-Session", wts_session)
+	res, _ := client.Do(req)
+
+	if err != nil {
+		return false, err
+	}
+
+	if res.StatusCode == 200 {
+		return true, nil
+	} else {
+		return false, nil
+	}
+}
+
 // Call Millennium API
 func Call(method string, method_type string, params map[string]interface{}) (interface{}, error) {
 	if wts_session == "" {
