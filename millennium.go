@@ -40,6 +40,7 @@ type MillenniumLogin struct {
 
 var client = &http.Client{}
 
+// Login into Millennium and generate the token
 func Login(hostname string, username string, password string, ssl bool) (bool, error) {
 	api_host = hostname
 	
@@ -75,6 +76,7 @@ func Login(hostname string, username string, password string, ssl bool) (bool, e
 	return true, nil
 }
 
+// Call Millennium API
 func Call(method string, method_type string, params map[string]interface{}) (interface{}, error) {
 	if wts_session == "" {
 		return nil, errors.New(ERROR_NOT_LOGGED_IN)
@@ -119,6 +121,7 @@ func Call(method string, method_type string, params map[string]interface{}) (int
 	return nil, nil
 }
 
+// Get data from API
 func Get(method string, params map[string]interface{}) (interface{}, error) {
 	return Call(method, "GET", params)
 }
