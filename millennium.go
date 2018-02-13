@@ -6,6 +6,7 @@
 package millennium
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -98,7 +99,7 @@ func Logout() (bool, error) {
 }
 
 // Call Millennium API
-func Call(method string, methodType string, params map[string]interface{}) (interface{}, error) {
+func Call(method string, methodType string, params map[string]interface{}, bodyStr []byte) (interface{}, error) {
 	if wtsSession == "" {
 		return nil, errors.New(ErrorNotLoggedIn)
 	}
@@ -111,7 +112,7 @@ func Call(method string, methodType string, params map[string]interface{}) (inte
 		p.Add(key, val.(string))
 	}
 
-	req, err := http.NewRequest(methodType, fmt.Sprintf("%s/%s?%s", apiURL, method, p.Encode()), nil)
+	req, err := http.NewRequest(methodType, fmt.Sprintf("%s/%s?%s", apiURL, method, p.Encode()), bytes.NewBuffer(bodyStr))
 	req.Header.Set("WTS-Session", wtsSession)
 	res, _ := client.Do(req)
 
@@ -148,10 +149,11 @@ func Call(method string, methodType string, params map[string]interface{}) (inte
 
 // Get data from API
 func Get(method string, params map[string]interface{}) (interface{}, error) {
-	return Call(method, "GET", params)
+	return Call(method, "GET", params, []byte(""))
 }
 
 // Post data to API
-func Post(method string, params map[string]interface{}) (interface{}, error) {
-	return Call(method, "POST", params)
+func Post(method string, body []byte) (interface{}, error) {
+	params := make(map[string]interface{})
+	return Call(method, "POST", params, body)
 }
