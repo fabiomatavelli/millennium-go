@@ -1,0 +1,14 @@
+sudo: false
+
+language: go
+
+before_script:
+  - go get -u github.com/golang/lint/golint
+
+go:
+  - 1.11.x
+  - master
+
+script:
+  - go build -v ./...
+  - go test -v ./...
