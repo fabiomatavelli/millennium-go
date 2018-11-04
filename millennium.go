@@ -6,146 +6,279 @@
 package millennium
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/tidwall/gjson"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
+
+	ntlmssp "github.com/Azure/go-ntlmssp"
 )
 
-var (
-	api_host     string
-	api_protocol string
-	api_url      string
-	wts_session  string
-)
+// AuthType Millennium authentication type
+type AuthType string
 
+// Authentication types available for Millennium
 const (
-	ERROR_NOT_AUTHORIZED   = "Login not authorized."
-	ERROR_NOT_LOGGED_IN    = "Not logged in."
-	ERROR_METHOD_NOT_FOUND = "Method not found."
-	ERROR_METHOD_EXECUTION = "Problem to execute method."
-	ERROR_UNMARSHALLING    = "Problem to parse JSON"
+	NTLM    AuthType = "NTLM"
+	Session AuthType = "SESSION"
 )
 
-var client = &http.Client{}
+// HTTPMethod type to communicate with Millennium
+type HTTPMethod string
 
-// Login into Millennium and generate the token
-func Login(hostname string, username string, password string, ssl bool) (bool, error) {
-	api_host = hostname
+// HTTP methods available
+const (
+	GET    HTTPMethod = "GET"
+	POST   HTTPMethod = "POST"
+	DELETE HTTPMethod = "DELETE"
+)
 
-	if ssl == true {
-		api_protocol = "https"
-	} else {
-		api_protocol = "http"
-	}
+// Millennium struct has the essential information to communicate with Millennium ERP
+type Millennium struct {
+	// Server used to store the server address
+	ServerAddr string
 
-	api_url = fmt.Sprintf("%s://%s/api", api_protocol, api_host)
+	// Client HTTP
+	Client *http.Client
 
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/login?$format=json", api_url), nil)
-	req.Header.Set("WTS-Authorization", fmt.Sprintf("%s/%s", strings.ToUpper(username), strings.ToUpper(password)))
-	res, _ := client.Do(req)
+	// Headers is a map of headers to pass to requests
+	headers http.Header
 
-	if res.StatusCode == 401 {
-		wts_session = ""
-		return false, errors.New(ERROR_NOT_AUTHORIZED)
-	}
-
-	body, _ := ioutil.ReadAll(res.Body)
-
-	if err != nil {
-		return false, err
-	}
-
-	data, ok := gjson.ParseBytes(body).Value().(map[string]interface{})
-
-	if !ok {
-		return false, errors.New(ERROR_UNMARSHALLING)
-	}
-
-	wts_session = data["session"].(string)
-
-	return true, nil
-}
-
-// Logout from Millennium
-func Logout() (bool, error) {
-	if wts_session == "" {
-		return false, errors.New(ERROR_NOT_LOGGED_IN)
-	}
-
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/logout", api_url), nil)
-	req.Header.Set("WTS-Session", wts_session)
-	res, _ := client.Do(req)
-
-	if err != nil {
-		return false, err
-	}
-
-	if res.StatusCode == 200 {
-		return true, nil
-	} else {
-		return false, nil
+	// credentials store the user data
+	credentials struct {
+		Username string
+		Password string
+		AuthType AuthType
+		Session  string
 	}
 }
 
-// Call Millennium API
-func Call(method string, method_type string, params map[string]interface{}) (interface{}, error) {
-	if wts_session == "" {
-		return nil, errors.New(ERROR_NOT_LOGGED_IN)
+// ResponseLogin type is the standard response struct from login requests
+type ResponseLogin struct {
+	Session string `json:"session"`
+}
+
+// ResponseGet type is the standard response struct from GET requests
+type ResponseGet struct {
+	Count int              `json:"odata.count"`
+	Value *json.RawMessage `json:"value"`
+}
+
+// ResponseError type is the standard response struct for errors
+type ResponseError struct {
+	Err struct {
+		Code    int `json:"code"`
+		Message struct {
+			Lang  string `json:"lang"`
+			Value string `json:"value"`
+		} `json:"message"`
+	} `json:"error"`
+}
+
+func (r *ResponseError) String() string {
+	return r.Err.Message.Value
+}
+
+func (r *ResponseError) Error() string {
+	return r.Err.Message.Value
+}
+
+// SetMessage sets a custom error message
+func (r *ResponseError) SetMessage(message string) {
+	r.Err.Message.Value = message
+}
+
+// SetCode sets a custom error code
+func (r *ResponseError) SetCode(code int) {
+	r.Err.Code = code
+}
+
+// Client returns a new Millennium instance with the server address
+func Client(server string, timeout time.Duration) (*Millennium, error) {
+	if server == "" || timeout == 0*time.Second {
+		return nil, errors.New("No server or timeout defined")
 	}
 
-	p := url.Values{}
-	p.Set("$format", "json")
-	p.Add("$dateformat", "iso")
-
-	for key, val := range params {
-		p.Add(key, val.(string))
-	}
-
-	req, err := http.NewRequest(method_type, fmt.Sprintf("%s/%s?%s", api_url, method, p.Encode()), nil)
-	req.Header.Set("WTS-Session", wts_session)
-	res, _ := client.Do(req)
-
+	// Parse the server address
+	addr, err := url.Parse(server)
 	if err != nil {
 		return nil, err
 	}
 
-	switch res.StatusCode {
-	case 401:
-		return nil, errors.New(ERROR_NOT_AUTHORIZED)
-	case 404:
-		return nil, fmt.Errorf("%s: %s", method, ERROR_METHOD_NOT_FOUND)
-	case 400:
-		return nil, fmt.Errorf("%s: %s", method, ERROR_METHOD_EXECUTION)
-	case 500:
-		return nil, fmt.Errorf("%s: %s", method, ERROR_METHOD_EXECUTION)
+	// Test server connection
+	conn, err := net.DialTimeout("tcp", addr.Host, timeout)
+	if err != nil {
+		return nil, err
 	}
+	conn.Close()
 
-	body, _ := ioutil.ReadAll(res.Body)
-
-	result, ok := gjson.ParseBytes(body).Value().(map[string]interface{})
-	if !ok {
-		return nil, errors.New(ERROR_UNMARSHALLING)
-	}
-
-	if method_type == "GET" {
-		return result["value"].(interface{}), nil
-	} else if method_type == "POST" {
-		return result, nil
-	}
-
-	return nil, nil
+	return &Millennium{
+		ServerAddr: server,
+		Client: &http.Client{
+			Timeout: timeout,
+		},
+	}, nil
 }
 
-// Get data from API
-func Get(method string, params map[string]interface{}) (interface{}, error) {
-	return Call(method, "GET", params)
+// Login requests login to Millennium server
+// server should be a valid URL with Millennium port, like: https://127.0.0.1:6018
+func (m *Millennium) Login(username string, password string, authType AuthType) error {
+	// Set Username and Password in credentials
+	m.credentials.Username = username
+	m.credentials.Password = password
+
+	// If AuthType equals NTLM then set client transport to ntlm negotiator
+	if authType == NTLM {
+		m.Client.Transport = ntlmssp.Negotiator{
+			RoundTripper: &http.Transport{},
+		}
+	}
+
+	if authType == Session {
+		var responseLogin ResponseLogin
+		m.headers = http.Header{}
+		m.headers.Set("WTS-Authorization", fmt.Sprintf("%s/%s", strings.ToUpper(m.credentials.Username), strings.ToUpper(m.credentials.Password)))
+		if err := m.Post("login", []byte{}, &responseLogin); err != nil {
+			return err
+		}
+
+		m.headers.Del("WTS-Authorization")
+
+		m.credentials.Session = responseLogin.Session
+		m.headers.Set("WTS-Session", m.credentials.Session)
+	}
+
+	m.credentials.AuthType = authType
+
+	return nil
 }
 
-// Post data to API
-func Post(method string, params map[string]interface{}) (interface{}, error) {
-	return Call(method, "POST", params)
+// RequestMethod receive data to pass to Request function
+type RequestMethod struct {
+	HTTPMethod HTTPMethod
+	Method     string
+	Params     url.Values
+	Body       []byte
+	Response   interface{}
+}
+
+// Request a method from Millennium
+func (m *Millennium) Request(r RequestMethod) error {
+	// Transform body of type []byte to io.Reader
+	bodyReader := bytes.NewReader(r.Body)
+
+	// Add default parameters for Millennium request
+	r.Params.Add("$format", "json")
+	r.Params.Add("$dateformat", "iso")
+
+	// Start a new request
+	req, err := http.NewRequest(string(r.HTTPMethod), fmt.Sprintf("%s/api/%s?%s", m.ServerAddr, r.Method, r.Params.Encode()), bodyReader)
+	req.Header = m.headers
+
+	if err != nil {
+		return err
+	}
+
+	// If authType is NTLM, set basic auth on request
+	if m.credentials.AuthType == NTLM {
+		req.SetBasicAuth(m.credentials.Username, m.credentials.Password)
+	}
+
+	if err := m.sendRequest(req, &r.Response); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *Millennium) sendRequest(request *http.Request, response interface{}) error {
+	// Request using the client
+	res, err := m.Client.Do(request)
+
+	if err != nil {
+		return err
+	}
+
+	if err := m.getResponse(res, &response); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *Millennium) getResponse(res *http.Response, output interface{}) error {
+	// Convert the response body to []byte
+	bodyRes, err := ioutil.ReadAll(res.Body)
+
+	if err != nil {
+		return err
+	}
+
+	if res.StatusCode >= 400 {
+		var resErr ResponseError
+		json.Unmarshal(bodyRes, &resErr)
+		return &resErr
+	}
+
+	// Unmarshal the response JSON to interface pointer
+	if err = json.Unmarshal(bodyRes, &output); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Get requests a method using GET http method
+func (m *Millennium) Get(method string, params url.Values, response interface{}) (int, error) {
+	var res ResponseGet
+
+	// Send a GET request to Millennium server
+	if err := m.Request(RequestMethod{
+		HTTPMethod: GET,
+		Method:     method,
+		Params:     params,
+		Response:   &res,
+	}); err != nil {
+		return 0, err
+	}
+
+	// Unmarshal response values to response parameter
+	if err := json.Unmarshal(*res.Value, response); err != nil {
+		return 0, nil
+	}
+
+	// If no error ocurs, return the total number of values
+	return res.Count, nil
+}
+
+// Post requests a method using POST http method
+func (m *Millennium) Post(method string, body []byte, response interface{}) error {
+	if err := m.Request(RequestMethod{
+		HTTPMethod: POST,
+		Method:     method,
+		Params:     url.Values{},
+		Body:       body,
+		Response:   &response,
+	}); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Delete requests a method using DELETE http method
+func (m *Millennium) Delete(method string, params url.Values) error {
+	if err := m.Request(RequestMethod{
+		HTTPMethod: DELETE,
+		Method:     method,
+		Params:     params,
+	}); err != nil {
+		return err
+	}
+	return nil
 }
