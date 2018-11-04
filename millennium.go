@@ -1,8 +1,6 @@
-// Author: Fábio Matavelli <fabiomatavelli@gmail.com>
-
-// This is a Millennium SDK written in Go to facilitate
-// the integration with the Millennium ERP.
-
+// Package millennium is a Millennium ERP library
+// written in Go to facilitate the integration with
+// Millennium ERP.
 package millennium
 
 import (
@@ -102,7 +100,7 @@ func (r *ResponseError) SetCode(code int) {
 // Client returns a new Millennium instance with the server address
 func Client(server string, timeout time.Duration) (*Millennium, error) {
 	if server == "" || timeout == 0*time.Second {
-		return nil, errors.New("No server or timeout defined")
+		return nil, errors.New("no server or timeout defined")
 	}
 
 	// Parse the server address
