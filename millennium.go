@@ -217,7 +217,10 @@ func (m *Millennium) getResponse(res *http.Response, output interface{}) error {
 
 	if res.StatusCode >= 400 {
 		var resErr ResponseError
-		json.Unmarshal(bodyRes, &resErr)
+		if err = json.Unmarshal(bodyRes, &resErr); err != nil {
+			return err
+		}
+
 		return &resErr
 	}
 
