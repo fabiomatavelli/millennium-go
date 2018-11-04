@@ -101,12 +101,8 @@ func (r *ResponseError) SetCode(code int) {
 
 // Client returns a new Millennium instance with the server address
 func Client(server string, timeout time.Duration) (*Millennium, error) {
-	if server == "" {
-		return nil, errors.New("No server defined")
-	}
-
-	if timeout == 0*time.Second {
-		return nil, errors.New("No timeout set")
+	if server == "" || timeout == 0*time.Second {
+		return nil, errors.New("No server or timeout defined")
 	}
 
 	// Parse the server address
