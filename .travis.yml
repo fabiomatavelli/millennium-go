@@ -1,24 +1,24 @@
 sudo: false
 language: go
 go:
-  - "1.x"
-  - master
+- 1.x
+- master
 env:
   global:
-    - CC_TEST_REPORTER_ID=a0af78184493a0c5dc13067047f619d9a202cb5af54e07ae1c8eedfd6a44c9ec
+  - secure: NvPxC1X/0NJWgd5A0DkZV+FB2NrhtDpO2oeXAg42LP0vdccPMPuxkAvQrn1IBalRCSXfn2KyX4aTXT31IdNqwLhiGK3eCPrlbSZvcKy/pt4gaNygPL3PPbRyMeP2qTpbDsEYuBFxofnCgfl5Z9UY4E8b/bYIRuJuMCAxjLFOvrumcJlPiwZ3Re0pKvNFGVTh1RHOoZGQaJkmA9pSUHYZlPfeSvvDsOHyqfG+hXXbSVSDTRfMKN7WITgDvxJ5e6DuCwbzEEa5OYqHhYl1bZ9jCbmD9zRNKHR/aJm5we0L65NoVHQNWe1vvG1rwFDMrVJCwXgpV3WT3dad4LPZylnGmrPDakBZEQugfkP65iRflifd62sMJ3W8WN6d+8ckecpNVjYmGMhDcb8AGHwKZmY/G5QOy4k1vIrCd6GxMc5vvJreQeryHMGiFJoQJaiCghgUplmStw9i9U+YCRaBjiQb88Fr+eGX55QV2srOVec+E25g5MXqDS2ElhbxOlahbbHGDQwpJzAnTfR6DpZoBFwkX7O4DYKNtNrVJ0Iyy8/kThS6fz7aJXkqHokmCU7aacJczsv2M1k1TPUSUjPShXSoqT5kcoGxffyLI6+Q9AlZ5YQy1po3QTcYEOw7aBsKvhXWkGl0v/EHj7+xGvI8/HBV616yq92BEN9WwAepq10BNEw=
 install:
-  - go get -t -v ./...
+- go get -t -v ./...
 before_script:
-  - curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > ./cc-test-reporter
-  - chmod +x ./cc-test-reporter
-  - ./cc-test-reporter before-build
+- "curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > ./cc-test-reporter"
+- chmod +x ./cc-test-reporter
+- "./cc-test-reporter before-build"
 script:
-  - go test -v -coverprofile=c.out ./...
+- go test -v -coverprofile=c.out ./...
 after_script:
-  - ./cc-test-reporter after-build --exit-code $TRAVIS_TEST_RESULT
+- "./cc-test-reporter after-build --exit-code $TRAVIS_TEST_RESULT"
 matrix:
   allow_failures:
-    - go: master
+  - go: master
   fast_finish: true
 addons:
   code_climate: true
