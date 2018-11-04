@@ -190,13 +190,29 @@ func (m *Millennium) Request(r RequestMethod) error {
 		req.SetBasicAuth(m.credentials.Username, m.credentials.Password)
 	}
 
+	if err := m.sendRequest(req, &r.Response); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *Millennium) sendRequest(request *http.Request, response interface{}) error {
 	// Request using the client
-	res, err := m.Client.Do(req)
+	res, err := m.Client.Do(request)
 
 	if err != nil {
 		return err
 	}
 
+	if err := m.getResponse(res, &response); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *Millennium) getResponse(res *http.Response, output interface{}) error {
 	// Convert the response body to []byte
 	bodyRes, err := ioutil.ReadAll(res.Body)
 
@@ -211,7 +227,7 @@ func (m *Millennium) Request(r RequestMethod) error {
 	}
 
 	// Unmarshal the response JSON to interface pointer
-	if err = json.Unmarshal(bodyRes, &r.Response); err != nil {
+	if err = json.Unmarshal(bodyRes, &output); err != nil {
 		return err
 	}
 
