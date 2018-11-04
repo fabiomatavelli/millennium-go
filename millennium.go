@@ -163,17 +163,26 @@ func (m *Millennium) Login(username string, password string, authType AuthType) 
 	return nil
 }
 
+// RequestMethod receive data to pass to Request function
+type RequestMethod struct {
+	HTTPMethod HTTPMethod
+	Method     string
+	Params     url.Values
+	Body       []byte
+	Response   interface{}
+}
+
 // Request a method from Millennium
-func (m *Millennium) Request(httpMethod HTTPMethod, method string, params url.Values, body []byte, response interface{}) error {
+func (m *Millennium) Request(r RequestMethod) error {
 	// Transform body of type []byte to io.Reader
-	bodyReader := bytes.NewReader(body)
+	bodyReader := bytes.NewReader(r.Body)
 
 	// Add default parameters for Millennium request
-	params.Add("$format", "json")
-	params.Add("$dateformat", "iso")
+	r.Params.Add("$format", "json")
+	r.Params.Add("$dateformat", "iso")
 
 	// Start a new request
-	req, err := http.NewRequest(string(httpMethod), fmt.Sprintf("%s/api/%s?%s", m.ServerAddr, method, params.Encode()), bodyReader)
+	req, err := http.NewRequest(string(r.HTTPMethod), fmt.Sprintf("%s/api/%s?%s", m.ServerAddr, r.Method, r.Params.Encode()), bodyReader)
 	req.Header = m.headers
 
 	if err != nil {
@@ -206,7 +215,7 @@ func (m *Millennium) Request(httpMethod HTTPMethod, method string, params url.Va
 	}
 
 	// Unmarshal the response JSON to interface pointer
-	if err = json.Unmarshal(bodyRes, &response); err != nil {
+	if err = json.Unmarshal(bodyRes, &r.Response); err != nil {
 		return err
 	}
 
@@ -218,7 +227,12 @@ func (m *Millennium) Get(method string, params url.Values, response interface{})
 	var res ResponseGet
 
 	// Send a GET request to Millennium server
-	if err := m.Request(GET, method, params, []byte{}, &res); err != nil {
+	if err := m.Request(RequestMethod{
+		HTTPMethod: GET,
+		Method:     method,
+		Params:     params,
+		Response:   &res,
+	}); err != nil {
 		return 0, err
 	}
 
@@ -233,7 +247,13 @@ func (m *Millennium) Get(method string, params url.Values, response interface{})
 
 // Post requests a method using POST http method
 func (m *Millennium) Post(method string, body []byte, response interface{}) error {
-	if err := m.Request(POST, method, url.Values{}, body, &response); err != nil {
+	if err := m.Request(RequestMethod{
+		HTTPMethod: POST,
+		Method:     method,
+		Params:     url.Values{},
+		Body:       body,
+		Response:   &response,
+	}); err != nil {
 		return err
 	}
 	return nil
@@ -241,9 +261,12 @@ func (m *Millennium) Post(method string, body []byte, response interface{}) erro
 
 // Delete requests a method using DELETE http method
 func (m *Millennium) Delete(method string, params url.Values) error {
-	if err := m.Request(DELETE, method, params, nil, nil); err != nil {
+	if err := m.Request(RequestMethod{
+		HTTPMethod: DELETE,
+		Method:     method,
+		Params:     params,
+	}); err != nil {
 		return err
 	}
-
 	return nil
 }
