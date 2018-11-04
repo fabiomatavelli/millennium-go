@@ -5,5 +5,3 @@ plugins:
     enabled: true
   golint:
     enabled: true
-exclude_paths:
-  - vendor/
