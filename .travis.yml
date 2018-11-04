@@ -2,18 +2,17 @@ sudo: false
 
 language: go
 
-before_script:
-  - go get -t golang.org/x/lint/golint
-
 go:
-  - "1.6.x"
-  - "1.7.x"
-  - "1.8.x"
   - "1.9.x"
   - "1.10.x"
   - "1.11.x"
   - master
 
+before_script:
+  - go get -t -v ./...
+
 script:
-  - go build -v ./...
-  - go test -v ./...
+  - go test -v ./... -race -coverprofile=coverage.txt -covermode=atomic
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
