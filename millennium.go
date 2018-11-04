@@ -1,8 +1,6 @@
-// Author: Fábio Matavelli <fabiomatavelli@gmail.com>
-
-// This is a Millennium SDK written in Go to facilitate
-// the integration with the Millennium ERP.
-
+// Package millennium is a Millennium ERP library
+// written in Go to facilitate the integration with
+// Millennium ERP.
 package millennium
 
 import (
@@ -102,7 +100,7 @@ func (r *ResponseError) SetCode(code int) {
 // Client returns a new Millennium instance with the server address
 func Client(server string, timeout time.Duration) (*Millennium, error) {
 	if server == "" || timeout == 0*time.Second {
-		return nil, errors.New("No server or timeout defined")
+		return nil, errors.New("no server or timeout defined")
 	}
 
 	// Parse the server address
@@ -190,7 +188,8 @@ func (m *Millennium) Request(r RequestMethod) error {
 		req.SetBasicAuth(m.credentials.Username, m.credentials.Password)
 	}
 
-	if err := m.sendRequest(req, &r.Response); err != nil {
+	err = m.sendRequest(req, &r.Response)
+	if err != nil {
 		return err
 	}
 
@@ -205,11 +204,7 @@ func (m *Millennium) sendRequest(request *http.Request, response interface{}) er
 		return err
 	}
 
-	if err := m.getResponse(res, &response); err != nil {
-		return err
-	}
-
-	return nil
+	return m.getResponse(res, &response)
 }
 
 func (m *Millennium) getResponse(res *http.Response, output interface{}) error {
@@ -227,11 +222,7 @@ func (m *Millennium) getResponse(res *http.Response, output interface{}) error {
 	}
 
 	// Unmarshal the response JSON to interface pointer
-	if err = json.Unmarshal(bodyRes, &output); err != nil {
-		return err
-	}
-
-	return nil
+	return json.Unmarshal(bodyRes, &output)
 }
 
 // Get requests a method using GET http method
@@ -259,26 +250,20 @@ func (m *Millennium) Get(method string, params url.Values, response interface{})
 
 // Post requests a method using POST http method
 func (m *Millennium) Post(method string, body []byte, response interface{}) error {
-	if err := m.Request(RequestMethod{
+	return m.Request(RequestMethod{
 		HTTPMethod: POST,
 		Method:     method,
 		Params:     url.Values{},
 		Body:       body,
 		Response:   &response,
-	}); err != nil {
-		return err
-	}
-	return nil
+	})
 }
 
 // Delete requests a method using DELETE http method
 func (m *Millennium) Delete(method string, params url.Values) error {
-	if err := m.Request(RequestMethod{
+	return m.Request(RequestMethod{
 		HTTPMethod: DELETE,
 		Method:     method,
 		Params:     params,
-	}); err != nil {
-		return err
-	}
-	return nil
+	})
 }
