@@ -89,6 +89,16 @@ func (r *ResponseError) Error() string {
 	return r.Err.Message.Value
 }
 
+// SetMessage sets a custom error message
+func (r *ResponseError) SetMessage(message string) {
+	r.Err.Message.Value = message
+}
+
+// SetCode sets a custom error code
+func (r *ResponseError) SetCode(code int) {
+	r.Err.Code = code
+}
+
 // Client returns a new Millennium instance with the server address
 func Client(server string, timeout time.Duration) (*Millennium, error) {
 	if server == "" {
