@@ -3,6 +3,7 @@
 [![Build Status](https://travis-ci.org/fabiomatavelli/millennium-go.svg?branch=master)](https://travis-ci.org/fabiomatavelli/millennium-go)
 [![Maintainability](https://api.codeclimate.com/v1/badges/85c1d065ae5a2a15aff2/maintainability)](https://codeclimate.com/github/fabiomatavelli/millennium-go/maintainability)
 [![Test Coverage](https://api.codeclimate.com/v1/badges/85c1d065ae5a2a15aff2/test_coverage)](https://codeclimate.com/github/fabiomatavelli/millennium-go/test_coverage)
+[![Go Report Card](https://goreportcard.com/badge/github.com/fabiomatavelli/millennium-go)](https://goreportcard.com/report/github.com/fabiomatavelli/millennium-go)
 
 Esta biblioteca tem o intuito de facilitar a integração com o ERP Millennium utilizando Go.
 
