@@ -37,7 +37,8 @@ type Filial struct {
 
 func main() {
   var filiais []Filial
-	client := millennium.Client("192.168.1.1:6017", 30)
+  client := millennium.Client("http://192.168.1.1:6017", 30)
+  
 
   total, err := client.Get("millenium.filiais.lista", url.Values{}, &filiais)
   
