@@ -121,6 +121,7 @@ func Client(server string, timeout time.Duration) (*Millennium, error) {
 		Client: &http.Client{
 			Timeout: timeout,
 		},
+		headers: http.Header{},
 	}, nil
 }
 
@@ -140,7 +141,6 @@ func (m *Millennium) Login(username string, password string, authType AuthType) 
 
 	if authType == Session {
 		var responseLogin ResponseLogin
-		m.headers = http.Header{}
 		m.headers.Set("WTS-Authorization", fmt.Sprintf("%s/%s", strings.ToUpper(m.credentials.Username), strings.ToUpper(m.credentials.Password)))
 		if err := m.Post("login", []byte{}, &responseLogin); err != nil {
 			return err
@@ -177,7 +177,9 @@ func (m *Millennium) Request(r RequestMethod) error {
 
 	// Start a new request
 	req, err := http.NewRequest(string(r.HTTPMethod), fmt.Sprintf("%s/api/%s?%s", m.ServerAddr, r.Method, r.Params.Encode()), bodyReader)
-	req.Header = m.headers
+	if m.headers != nil {
+		req.Header = m.headers
+	}
 
 	if err != nil {
 		return err
@@ -217,7 +219,10 @@ func (m *Millennium) getResponse(res *http.Response, output interface{}) error {
 
 	if res.StatusCode >= 400 {
 		var resErr ResponseError
-		json.Unmarshal(bodyRes, &resErr)
+		if err = json.Unmarshal(bodyRes, &resErr); err != nil {
+			return err
+		}
+
 		return &resErr
 	}
 
