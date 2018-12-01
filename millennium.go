@@ -205,12 +205,7 @@ func (m *Millennium) Request(r RequestMethod) (err error) {
 		req.SetBasicAuth(m.credentials.Username, m.credentials.Password)
 	}
 
-	err = m.sendRequest(req, &r.Response)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return m.sendRequest(req, &r.Response)
 }
 
 func (m *Millennium) sendRequest(request *http.Request, response interface{}) error {
