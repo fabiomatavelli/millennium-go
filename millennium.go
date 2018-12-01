@@ -167,13 +167,23 @@ type RequestMethod struct {
 }
 
 // Request a method from Millennium
-func (m *Millennium) Request(r RequestMethod) error {
+func (m *Millennium) Request(r RequestMethod) (err error) {
 	// Transform body of type []byte to io.Reader
 	bodyReader := bytes.NewReader(r.Body)
+
+	// Ensure that the Millennium method is defined before request
+	if r.Method == "" {
+		return errors.New("Requested method could not be empty")
+	}
 
 	// Ensure Params set if it is empty (nil)
 	if r.Params == nil {
 		r.Params = url.Values{}
+	}
+
+	// Ensure Response defined if http methods are GET or POST
+	if r.Response == nil && (r.HTTPMethod == http.MethodPost || r.HTTPMethod == http.MethodGet) {
+		return errors.New("Response should have an interface to point to")
 	}
 
 	// Add default parameters for Millennium request
