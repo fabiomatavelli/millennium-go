@@ -2,6 +2,7 @@ package millennium
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -28,57 +29,126 @@ func (s *mockHTTPServer) jsonError(message string, errorCode int) []byte {
 	return res
 }
 
+type writeOutputParams struct {
+	Writer      http.ResponseWriter
+	Request     *http.Request
+	StatusCode  int
+	ContentType string
+	Body        []byte
+}
+
+func (s *mockHTTPServer) writeOutput(p *writeOutputParams) {
+	if p.ContentType != "" {
+		p.Writer.Header().Set("Content-Type", p.ContentType)
+	} else {
+		p.Writer.Header().Set("Content-Type", "application/json")
+	}
+
+	if p.StatusCode > 0 {
+		p.Writer.WriteHeader(p.StatusCode)
+	} else {
+		p.Writer.WriteHeader(200)
+	}
+
+	_, err := p.Writer.Write(p.Body)
+	if err != nil {
+		panic(err)
+	}
+}
+
 func (s *mockHTTPServer) Start() *httptest.Server {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", http.NotFound)
 	mux.HandleFunc("/api/login", func(w http.ResponseWriter, r *http.Request) {
+		var err error
+
 		w.Header().Set("Content-Type", "application/json")
 		if r.Header.Get("WTS-Authorization") == "TEST/TEST" {
-			w.Write([]byte(`{"session":"{00000000-0000-0000-0000-000000000000}"}`))
+			_, err = w.Write([]byte(`{"session":"{00000000-0000-0000-0000-000000000000}"}`))
 		} else {
 			w.WriteHeader(http.StatusUnauthorized)
-			w.Write(s.jsonError("PERMISSÃO NEGADA:\r\rNão é possível autenticar o usuário. Senha inválida.", 401))
+			_, err = w.Write(s.jsonError("PERMISSÃO NEGADA:\r\rNão é possível autenticar o usuário. Senha inválida.", 401))
+		}
+
+		if err != nil {
+			panic(err)
 		}
 	})
 	mux.HandleFunc("/api/test.success.GET", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"odata.count": 1,"value":[{"number":1,"string":"test","bool":true}]}`))
+		s.writeOutput(&writeOutputParams{
+			Writer:     w,
+			Request:    r,
+			StatusCode: 200,
+			Body:       []byte(`{"odata.count": 1,"value":[{"number":1,"string":"test","bool":true}]}`),
+		})
 	})
 	mux.HandleFunc("/api/test.error400.GET", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write(s.jsonError("Parameter not found", http.StatusBadRequest))
+		s.writeOutput(&writeOutputParams{
+			Writer:     w,
+			Request:    r,
+			StatusCode: http.StatusBadRequest,
+			Body:       s.jsonError("Parameter not found", http.StatusBadRequest),
+		})
 	})
 	mux.HandleFunc("/api/test.error500.GET", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write(s.jsonError("Query error", http.StatusInternalServerError))
+		s.writeOutput(&writeOutputParams{
+			Writer:     w,
+			Request:    r,
+			StatusCode: http.StatusInternalServerError,
+			Body:       s.jsonError("Query error", http.StatusInternalServerError),
+		})
 	})
 	mux.HandleFunc("/api/test.error.invalidjson", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"odata.count": 1,"value":["test":"test"}`))
+		s.writeOutput(&writeOutputParams{
+			Writer:  w,
+			Request: r,
+			Body:    []byte(`{"odata.count": 1,"value":["test":"test"}`),
+		})
+	})
+	mux.HandleFunc("/api/test.error.invalidjsonerror", func(w http.ResponseWriter, r *http.Request) {
+		s.writeOutput(&writeOutputParams{
+			Writer:     w,
+			Request:    r,
+			StatusCode: http.StatusInternalServerError,
+			Body:       []byte(`{"error":{"`),
+		})
 	})
 	mux.HandleFunc("/api/test.error.empty", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(``))
+		s.writeOutput(&writeOutputParams{
+			Writer:  w,
+			Request: r,
+			Body:    []byte(``),
+		})
 	})
 	mux.HandleFunc("/api/test.success.POST", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"number":1,"string":"test","bool":true}`))
+		s.writeOutput(&writeOutputParams{
+			Writer:  w,
+			Request: r,
+			Body:    []byte(`{"number":1,"string":"test","bool":true}`),
+		})
 	})
 	mux.HandleFunc("/api/test.error.POST", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write(s.jsonError("Internal Server Error", http.StatusInternalServerError))
+		s.writeOutput(&writeOutputParams{
+			Writer:     w,
+			Request:    r,
+			StatusCode: http.StatusInternalServerError,
+			Body:       s.jsonError("Internal Server Error", http.StatusInternalServerError),
+		})
 	})
 	mux.HandleFunc("/api/test.success.DELETE", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"odata.metadata":""}`))
+		s.writeOutput(&writeOutputParams{
+			Writer:  w,
+			Request: r,
+			Body:    []byte(`{"odata.metadata":""}`),
+		})
 	})
 	mux.HandleFunc("/api/test.error.DELETE", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write(s.jsonError("Query error", http.StatusInternalServerError))
+		s.writeOutput(&writeOutputParams{
+			Writer:     w,
+			Request:    r,
+			StatusCode: http.StatusInternalServerError,
+			Body:       s.jsonError("Query error", http.StatusInternalServerError),
+		})
 	})
 
 	s.testServer = httptest.NewServer(mux)
@@ -126,6 +196,11 @@ func TestClient(t *testing.T) {
 		},
 		{
 			Server:      "http://127.0.0.2:6018",
+			Timeout:     1 * time.Second,
+			ExpectError: true,
+		},
+		{
+			Server:      "http://127.0.0.2:6018\n",
 			Timeout:     1 * time.Second,
 			ExpectError: true,
 		},
@@ -179,6 +254,80 @@ func TestLogin(t *testing.T) {
 		err := client.Login(c.Username, c.Password, c.AuthType)
 		if (err == nil) == c.ExpectError {
 			t.Error(err)
+		}
+	}
+}
+
+func TestNTLM(t *testing.T) {
+	client := NewClient(t)
+	err := client.Login("test", "test", NTLM)
+	if err != nil {
+		t.Error(err)
+	}
+
+	var _r interface{}
+	client.Get("test.success.GET", url.Values{}, &_r)
+}
+
+func TestRequest(t *testing.T) {
+	client := NewClient(t)
+
+	var r interface{}
+	cases := []struct {
+		Params      RequestMethod
+		ExpectError bool
+	}{
+		{
+			Params: RequestMethod{
+				HTTPMethod: "[GET",
+				Method:     "test.success.GET",
+			},
+			ExpectError: true,
+		},
+		{
+			Params: RequestMethod{
+				HTTPMethod: "GET",
+				Method:     "test.success.GET",
+			},
+			ExpectError: true,
+		},
+		{
+			Params: RequestMethod{
+				HTTPMethod: "GET",
+			},
+			ExpectError: true,
+		},
+		{
+			Params: RequestMethod{
+				HTTPMethod: "GET",
+				Method:     "test.success.GET",
+				Response:   &r,
+			},
+			ExpectError: false,
+		},
+		{
+			Params: RequestMethod{
+				HTTPMethod: "GET",
+				Method:     "test.error.invalidjsonerror",
+				Response:   &r,
+			},
+			ExpectError: true,
+		},
+		{
+			Params: RequestMethod{
+				HTTPMethod: "GET",
+				Method:     "test.error.invalidjson",
+				Response:   &r,
+			},
+			ExpectError: true,
+		},
+	}
+
+	for x, c := range cases {
+		err := client.Request(c.Params)
+
+		if (err == nil) == c.ExpectError {
+			t.Errorf("Test #%v got error '%v'", x, err)
 		}
 	}
 }
@@ -255,10 +404,16 @@ func TestGet(t *testing.T) {
 		},
 	}
 
-	for _, c := range cases {
+	for x, c := range cases {
 		count, err := client.Get(c.Method, c.Params, &c.Response)
 		if (err == nil) == c.Expect.Error {
 			t.Error(err)
+		}
+
+		if c.Expect.Error {
+			if fmt.Sprint(err) == "" {
+				t.Errorf("No error string returned on case %v", x)
+			}
 		}
 
 		if count != c.Expect.Count {
