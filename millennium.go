@@ -192,12 +192,12 @@ func (m *Millennium) Request(r RequestMethod) (err error) {
 
 	// Start a new request
 	req, err := http.NewRequest(string(r.HTTPMethod), fmt.Sprintf("%s/api/%s?%s", m.ServerAddr, r.Method, r.Params.Encode()), bodyReader)
-	if m.headers != nil {
-		req.Header = m.headers
-	}
-
 	if err != nil {
 		return err
+	}
+
+	if m.headers != nil {
+		req.Header = m.headers
 	}
 
 	// If authType is NTLM, set basic auth on request
