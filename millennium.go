@@ -171,6 +171,11 @@ func (m *Millennium) Request(r RequestMethod) error {
 	// Transform body of type []byte to io.Reader
 	bodyReader := bytes.NewReader(r.Body)
 
+	// Ensure Params set if it is empty (nil)
+	if r.Params == nil {
+		r.Params = url.Values{}
+	}
+
 	// Add default parameters for Millennium request
 	r.Params.Add("$format", "json")
 	r.Params.Add("$dateformat", "iso")
