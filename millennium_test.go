@@ -266,7 +266,14 @@ func TestNTLM(t *testing.T) {
 	}
 
 	var _r interface{}
-	client.Get("test.success.GET", url.Values{}, &_r)
+	x, err := client.Get("test.success.GET", url.Values{}, &_r)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if x == 0 {
+		t.Error("Zero records returned")
+	}
 }
 
 func TestRequest(t *testing.T) {
