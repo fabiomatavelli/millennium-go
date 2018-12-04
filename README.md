@@ -4,6 +4,7 @@
 [![Maintainability](https://api.codeclimate.com/v1/badges/85c1d065ae5a2a15aff2/maintainability)](https://codeclimate.com/github/fabiomatavelli/millennium-go/maintainability)
 [![Test Coverage](https://api.codeclimate.com/v1/badges/85c1d065ae5a2a15aff2/test_coverage)](https://codeclimate.com/github/fabiomatavelli/millennium-go/test_coverage)
 [![Go Report Card](https://goreportcard.com/badge/github.com/fabiomatavelli/millennium-go)](https://goreportcard.com/report/github.com/fabiomatavelli/millennium-go)
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Ffabiomatavelli%2Fmillennium-go.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Ffabiomatavelli%2Fmillennium-go?ref=badge_shield)
 
 Esta biblioteca tem o intuito de facilitar a integração com o ERP Millennium utilizando Go.
 
@@ -55,3 +56,6 @@ func main() {
   }
 }
 ```
+
+## License
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Ffabiomatavelli%2Fmillennium-go.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Ffabiomatavelli%2Fmillennium-go?ref=badge_large)
