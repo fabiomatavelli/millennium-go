@@ -8,14 +8,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
-	ntlmssp "github.com/Azure/go-ntlmssp"
+	"github.com/Azure/go-ntlmssp"
 )
 
 // AuthType Millennium authentication type
@@ -173,7 +173,7 @@ func (m *Millennium) Request(r RequestMethod) (err error) {
 
 	// Ensure that the Millennium method is defined before request
 	if r.Method == "" {
-		return errors.New("Requested method could not be empty")
+		return errors.New("requested method could not be empty")
 	}
 
 	// Ensure Params set if it is empty (nil)
@@ -183,7 +183,7 @@ func (m *Millennium) Request(r RequestMethod) (err error) {
 
 	// Ensure Response defined if http methods are GET or POST
 	if r.Response == nil && (r.HTTPMethod == http.MethodPost || r.HTTPMethod == http.MethodGet) {
-		return errors.New("Response should have an interface to point to")
+		return errors.New("response should have an interface to point to")
 	}
 
 	// Add default parameters for Millennium request
@@ -193,7 +193,7 @@ func (m *Millennium) Request(r RequestMethod) (err error) {
 	// Start a new request
 	req, err := http.NewRequest(string(r.HTTPMethod), fmt.Sprintf("%s/api/%s?%s", m.ServerAddr, r.Method, r.Params.Encode()), bodyReader)
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to start new request to Millennium: %w", err)
 	}
 
 	if m.headers != nil {
@@ -221,7 +221,8 @@ func (m *Millennium) sendRequest(request *http.Request, response interface{}) er
 
 func (m *Millennium) getResponse(res *http.Response, output interface{}) error {
 	// Convert the response body to []byte
-	bodyRes, err := ioutil.ReadAll(res.Body)
+	bodyRes, err := io.ReadAll(res.Body)
+	defer res.Body.Close()
 
 	if err != nil {
 		return err

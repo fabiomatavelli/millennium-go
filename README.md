@@ -26,7 +26,7 @@ No exemplo abaixo, iremos listar todas as filiais cadastradas no Millennium
 package main
 
 import (
-	millennium "github.com/fabiomatavelli/millennium-go"
+	"github.com/fabiomatavelli/millennium-go"
 )
 
 type Filial struct {
