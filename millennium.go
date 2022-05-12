@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -114,7 +113,7 @@ func (r *ResponseError) SetCode(code int) {
 // Deprecated: just for backward compatibility
 func Client(server string, timeout time.Duration) (*Millennium, error) {
 	return NewClient(context.Background(), server, timeout)
-	}
+}
 
 // NewClient returns a new Millennium instance with the server address and timeout
 func NewClient(ctx context.Context, server string, timeout time.Duration) (*Millennium, error) {
@@ -221,7 +220,7 @@ func (m *Millennium) Request(r RequestMethod) (err error) {
 
 	// Ensure Response defined if http methods are GET or POST
 	if r.Response == nil && (r.HTTPMethod == http.MethodPost || r.HTTPMethod == http.MethodGet) {
-		return errors.New("response should have an interface to point to")
+		return errors.New("response should have something to point to")
 	}
 
 	// Add default parameters for Millennium request
@@ -258,7 +257,7 @@ func (m *Millennium) sendRequest(request *retryablehttp.Request, response interf
 
 	res, err := m.client.Do(request)
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to send request: %w", err)
 	}
 
 	return m.getResponse(res, &response)
@@ -268,16 +267,15 @@ func (m *Millennium) sendRequest(request *retryablehttp.Request, response interf
 func (m *Millennium) getResponse(res *http.Response, output interface{}) error {
 	// Convert the response body to []byte
 	bodyRes, err := io.ReadAll(res.Body)
-	defer res.Body.Close()
-
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to read body from Millennium response: %w", err)
 	}
+	defer res.Body.Close()
 
 	if res.StatusCode >= 400 {
 		var resErr ResponseError
 		if err = json.Unmarshal(bodyRes, &resErr); err != nil {
-			return err
+			return fmt.Errorf("unable to unmarshal error response: %w", err)
 		}
 
 		return &resErr
@@ -292,18 +290,20 @@ func (m *Millennium) Get(method string, params url.Values, response interface{})
 	var res ResponseGet
 
 	// Send a GET request to Millennium server
-	if err := m.Request(RequestMethod{
+	err := m.Request(RequestMethod{
 		HTTPMethod: GET,
 		Method:     method,
 		Params:     params,
 		Response:   &res,
-	}); err != nil {
-		return 0, err
+	})
+
+	if err != nil {
+		return 0, fmt.Errorf("unable to make the request to Millennium: %w", err)
 	}
 
 	// Unmarshal response values to response parameter
 	if err := json.Unmarshal(*res.Value, response); err != nil {
-		return 0, nil
+		return 0, fmt.Errorf("unable to unmarshal JSON: %w", err)
 	}
 
 	// If no error ocurs, return the total number of values
