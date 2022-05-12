@@ -1,6 +1,7 @@
 package millennium
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -159,8 +160,8 @@ func (s *mockHTTPServer) Stop() {
 	s.testServer.Close()
 }
 
-func NewClient(t *testing.T) *Millennium {
-	client, err := Client(serverAddr, 30*time.Second)
+func NewTestClient(t *testing.T) *Millennium {
+	client, err := NewClient(context.Background(), serverAddr, 30*time.Second)
 	if err != nil {
 		t.Fatalf("Got error: %v", err)
 	}
@@ -180,31 +181,37 @@ func TestMain(m *testing.M) {
 
 func TestClient(t *testing.T) {
 	cases := []struct {
+		Context     context.Context
 		Server      string
 		Timeout     time.Duration
 		ExpectError bool
 	}{
 		{
+			Context:     context.Background(),
 			Server:      "",
 			Timeout:     30 * time.Second,
 			ExpectError: true,
 		},
 		{
+			Context:     context.Background(),
 			Server:      serverAddr,
 			Timeout:     0 * time.Second,
 			ExpectError: true,
 		},
 		{
-			Server:      "http://127.0.0.2:6018",
-			Timeout:     1 * time.Second,
+			Context:     context.Background(),
+			Server:      "http://1.2.3.4:6018",
+			Timeout:     3 * time.Second,
 			ExpectError: true,
 		},
 		{
-			Server:      "http://127.0.0.2:6018\n",
-			Timeout:     1 * time.Second,
+			Context:     context.Background(),
+			Server:      "http://1.2.3.4:6018\n",
+			Timeout:     3 * time.Second,
 			ExpectError: true,
 		},
 		{
+			Context:     context.Background(),
 			Server:      serverAddr,
 			Timeout:     30 * time.Second,
 			ExpectError: false,
@@ -212,18 +219,31 @@ func TestClient(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		_, err := Client(c.Server, c.Timeout)
-		t.Logf("Trying to connect to: '%v' with timeout %v", c.Server, c.Timeout)
-		if (err == nil) == c.ExpectError {
-			t.Error(err)
-		} else {
-			t.Logf("Passed verication of address '%v' with success!", c.Server)
-		}
+		t.Run(fmt.Sprintf("%s %v", c.Server, c.Timeout), func(t *testing.T) {
+			var x []interface{}
+			cli, err := NewClient(c.Context, c.Server, c.Timeout)
+			if (err != nil) == c.ExpectError {
+				t.Logf("Got expected error: %s", err)
+			} else {
+				t.Logf("Trying to send request to: '%v' with timeout %v", c.Server, c.Timeout)
+				err = cli.Request(RequestMethod{
+					HTTPMethod: http.MethodGet,
+					Method:     "x.x.x",
+					Response:   &x,
+				})
+
+				if (err != nil) == c.ExpectError {
+					t.Logf("Got expected error: %s", err)
+				} else {
+					t.Errorf("Got unexpected error: %s!", err)
+				}
+			}
+		})
 	}
 }
 
 func TestLogin(t *testing.T) {
-	client := NewClient(t)
+	client := NewTestClient(t)
 	cases := []struct {
 		Username    string
 		Password    string
@@ -251,15 +271,17 @@ func TestLogin(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		err := client.Login(c.Username, c.Password, c.AuthType)
-		if (err == nil) == c.ExpectError {
-			t.Error(err)
-		}
+		t.Run(fmt.Sprintf("%s:%s_%s", c.Username, c.Password, c.AuthType), func(t *testing.T) {
+			err := client.Login(c.Username, c.Password, c.AuthType)
+			if (err == nil) == c.ExpectError {
+				t.Error(err)
+			}
+		})
 	}
 }
 
 func TestNTLM(t *testing.T) {
-	client := NewClient(t)
+	client := NewTestClient(t)
 	err := client.Login("test", "test", NTLM)
 	if err != nil {
 		t.Error(err)
@@ -277,7 +299,7 @@ func TestNTLM(t *testing.T) {
 }
 
 func TestRequest(t *testing.T) {
-	client := NewClient(t)
+	client := NewTestClient(t)
 
 	var r interface{}
 	cases := []struct {
@@ -340,7 +362,7 @@ func TestRequest(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	client := NewClient(t)
+	client := NewTestClient(t)
 
 	type ResponseTestGET struct {
 		Number int    `json:"number"`
@@ -412,25 +434,27 @@ func TestGet(t *testing.T) {
 	}
 
 	for x, c := range cases {
-		count, err := client.Get(c.Method, c.Params, &c.Response)
-		if (err == nil) == c.Expect.Error {
-			t.Error(err)
-		}
-
-		if c.Expect.Error {
-			if fmt.Sprint(err) == "" {
-				t.Errorf("No error string returned on case %v", x)
+		t.Run(c.Method, func(t *testing.T) {
+			count, err := client.Get(c.Method, c.Params, &c.Response)
+			if (err == nil) == c.Expect.Error {
+				t.Error(err)
 			}
-		}
 
-		if count != c.Expect.Count {
-			t.Errorf("Expected %v results but got %v", c.Expect.Count, count)
-		}
+			if c.Expect.Error {
+				if fmt.Sprint(err) == "" {
+					t.Errorf("No error string returned on case %v", x)
+				}
+			}
+
+			if count != c.Expect.Count {
+				t.Errorf("Expected %v results but got %v", c.Expect.Count, count)
+			}
+		})
 	}
 }
 
 func TestPost(t *testing.T) {
-	client := NewClient(t)
+	client := NewTestClient(t)
 
 	type ResponseTestPOST struct {
 		Number int    `json:"number"`
@@ -456,17 +480,19 @@ func TestPost(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		var res *ResponseTestPOST
-		err := client.Post(c.Method, c.Body, &res)
-		if (err == nil) == c.ExpectError {
-			t.Error(err)
-		}
-		_ = res
+		t.Run(c.Method, func(t *testing.T) {
+			var res *ResponseTestPOST
+			err := client.Post(c.Method, c.Body, &res)
+			if (err == nil) == c.ExpectError {
+				t.Error(err)
+			}
+			_ = res
+		})
 	}
 }
 
 func TestDelete(t *testing.T) {
-	client := NewClient(t)
+	client := NewTestClient(t)
 
 	cases := []struct {
 		Method      string
