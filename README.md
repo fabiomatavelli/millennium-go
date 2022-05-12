@@ -16,7 +16,7 @@ Para começar a utilizar o Millennium com Go, instale o Go e rode o `go get`:
 go get -u github.com/fabiomatavelli/millennium-go
 ```
 
-Isso irá baixar a instalar a biblioteca.
+Isso irá baixar a instalar a biblioteca e suas dependências.
 
 ## Exemplo
 
