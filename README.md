@@ -38,15 +38,18 @@ type Filial struct {
 
 func main() {
   var filiais []Filial
-  client := millennium.Client("http://192.168.1.1:6017", 30)
+  client := millennium.NewClient(context.Background(), "http://192.168.1.1:6017", 30)
   
   // Login utilizando a sessão do Millennium
-  client.Login("usuario", "senha", millennium.Session)
+  err := client.Login("usuario", "senha", millennium.Session)
+  if err != nil {
+    panic(err)
+  }
 
   total, err := client.Get("millenium.filiais.lista", url.Values{}, &filiais)
   
   if err != nil {
-    fmt.Print(err)
+    panic(err)
   }
 
   if total > 0 {
