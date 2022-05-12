@@ -5,6 +5,7 @@ package millennium
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 	"time"
 
 	"github.com/Azure/go-ntlmssp"
+	"github.com/hashicorp/go-retryablehttp"
 )
 
 // AuthType Millennium authentication type
@@ -37,13 +39,25 @@ const (
 	DELETE HTTPMethod = "DELETE"
 )
 
+const (
+	RetryMax = 3
+)
+
 // Millennium struct has the essential information to communicate with Millennium ERP
 type Millennium struct {
 	// Server used to store the server address
 	ServerAddr string
 
-	// Client HTTP
-	Client *http.Client
+	// HTTP Client
+	HTTPClient *http.Client
+
+	// Client points to retryable http lib
+	client *retryablehttp.Client
+
+	// Context
+	Context context.Context
+
+	Timeout time.Duration
 
 	// Headers is a map of headers to pass to requests
 	headers http.Header
@@ -97,32 +111,52 @@ func (r *ResponseError) SetCode(code int) {
 	r.Err.Code = code
 }
 
-// Client returns a new Millennium instance with the server address
+// Deprecated: just for backward compatibility
 func Client(server string, timeout time.Duration) (*Millennium, error) {
-	if server == "" || timeout == 0*time.Second {
-		return nil, errors.New("no server or timeout defined")
+	return NewClient(context.Background(), server, timeout)
 	}
 
-	// Parse the server address
-	addr, err := url.Parse(server)
-	if err != nil {
-		return nil, err
+// NewClient returns a new Millennium instance with the server address and timeout
+func NewClient(ctx context.Context, server string, timeout time.Duration) (*Millennium, error) {
+	if server == "" {
+		return nil, errors.New("no server address defined")
 	}
 
-	// Test server connection
-	conn, err := net.DialTimeout("tcp", addr.Host, timeout)
-	if err != nil {
-		return nil, err
+	if timeout == 0*time.Second {
+		return nil, errors.New("timeout is zero")
 	}
-	conn.Close()
 
-	return &Millennium{
+	// // Parse server address
+	// url, err := url.Parse(server)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("unable to parse server address: %w", err)
+	// }
+
+	// conn :=
+	// conn.Close()
+
+	m := &Millennium{
 		ServerAddr: server,
-		Client: &http.Client{
-			Timeout: timeout,
-		},
-		headers: http.Header{},
-	}, nil
+		Context:    ctx,
+		Timeout:    timeout,
+		headers:    http.Header{},
+	}
+
+	if m.Context == nil {
+		m.Context = context.Background()
+	}
+
+	m.client = m.setClient()
+
+	return m, nil
+}
+
+func (m *Millennium) setClient() *retryablehttp.Client {
+	client := retryablehttp.NewClient()
+	client.RetryMax = RetryMax
+	client.HTTPClient = m.HTTPClient
+
+	return client
 }
 
 // Login requests login to Millennium server
@@ -134,7 +168,11 @@ func (m *Millennium) Login(username string, password string, authType AuthType) 
 
 	// If AuthType equals NTLM then set client transport to ntlm negotiator
 	if authType == NTLM {
-		m.Client.Transport = ntlmssp.Negotiator{
+		if m.HTTPClient == nil {
+			m.HTTPClient = &http.Client{}
+		}
+
+		m.HTTPClient.Transport = ntlmssp.Negotiator{
 			RoundTripper: &http.Transport{},
 		}
 	}
@@ -191,7 +229,11 @@ func (m *Millennium) Request(r RequestMethod) (err error) {
 	r.Params.Add("$dateformat", "iso")
 
 	// Start a new request
-	req, err := http.NewRequest(string(r.HTTPMethod), fmt.Sprintf("%s/api/%s?%s", m.ServerAddr, r.Method, r.Params.Encode()), bodyReader)
+	requestMethod := string(r.HTTPMethod)
+	requestURL := fmt.Sprintf("%s/api/%s?%s", m.ServerAddr, r.Method, r.Params.Encode())
+	requestBody := bodyReader
+
+	req, err := retryablehttp.NewRequestWithContext(m.Context, requestMethod, requestURL, requestBody)
 	if err != nil {
 		return fmt.Errorf("unable to start new request to Millennium: %w", err)
 	}
@@ -208,10 +250,13 @@ func (m *Millennium) Request(r RequestMethod) (err error) {
 	return m.sendRequest(req, &r.Response)
 }
 
-func (m *Millennium) sendRequest(request *http.Request, response interface{}) error {
+func (m *Millennium) sendRequest(request *retryablehttp.Request, response interface{}) error {
 	// Request using the client
-	res, err := m.Client.Do(request)
+	ctx, cancel := context.WithTimeout(request.Context(), m.Timeout)
+	request = request.WithContext(ctx)
+	defer cancel()
 
+	res, err := m.client.Do(request)
 	if err != nil {
 		return err
 	}
@@ -219,6 +264,7 @@ func (m *Millennium) sendRequest(request *http.Request, response interface{}) er
 	return m.getResponse(res, &response)
 }
 
+// Will handle the response from Millennium for GET requests
 func (m *Millennium) getResponse(res *http.Response, output interface{}) error {
 	// Convert the response body to []byte
 	bodyRes, err := io.ReadAll(res.Body)
