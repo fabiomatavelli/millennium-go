@@ -47,11 +47,8 @@ type Millennium struct {
 	// Server used to store the server address
 	ServerAddr string
 
-	// HTTP Client
-	HTTPClient *http.Client
-
 	// Client points to retryable http lib
-	client *retryablehttp.Client
+	Client *retryablehttp.Client
 
 	// Context
 	Context context.Context
@@ -125,15 +122,6 @@ func NewClient(ctx context.Context, server string, timeout time.Duration) (*Mill
 		return nil, errors.New("timeout is zero")
 	}
 
-	// // Parse server address
-	// url, err := url.Parse(server)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("unable to parse server address: %w", err)
-	// }
-
-	// conn :=
-	// conn.Close()
-
 	m := &Millennium{
 		ServerAddr: server,
 		Context:    ctx,
@@ -145,7 +133,7 @@ func NewClient(ctx context.Context, server string, timeout time.Duration) (*Mill
 		m.Context = context.Background()
 	}
 
-	m.client = m.setClient()
+	m.Client = m.setClient()
 
 	return m, nil
 }
@@ -153,7 +141,6 @@ func NewClient(ctx context.Context, server string, timeout time.Duration) (*Mill
 func (m *Millennium) setClient() *retryablehttp.Client {
 	client := retryablehttp.NewClient()
 	client.RetryMax = RetryMax
-	client.HTTPClient = m.HTTPClient
 
 	return client
 }
@@ -167,11 +154,7 @@ func (m *Millennium) Login(username string, password string, authType AuthType) 
 
 	// If AuthType equals NTLM then set client transport to ntlm negotiator
 	if authType == NTLM {
-		if m.HTTPClient == nil {
-			m.HTTPClient = &http.Client{}
-		}
-
-		m.HTTPClient.Transport = ntlmssp.Negotiator{
+		m.Client.HTTPClient.Transport = ntlmssp.Negotiator{
 			RoundTripper: &http.Transport{},
 		}
 	}
@@ -255,7 +238,7 @@ func (m *Millennium) sendRequest(request *retryablehttp.Request, response interf
 	request = request.WithContext(ctx)
 	defer cancel()
 
-	res, err := m.client.Do(request)
+	res, err := m.Client.Do(request)
 	if err != nil {
 		return fmt.Errorf("unable to send request: %w", err)
 	}
