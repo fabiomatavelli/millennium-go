@@ -8,6 +8,6 @@ require (
 )
 
 require (
-	github.com/hashicorp/go-cleanhttp v0.5.1 // indirect
-	golang.org/x/crypto v0.0.0-20220507011949-2cf3adece122 // indirect
+	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
+	golang.org/x/crypto v0.0.0-20220511200225-c6db032c6c88 // indirect
 )
