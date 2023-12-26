@@ -1,6 +1,6 @@
 module github.com/fabiomatavelli/millennium-go
 
-go 1.18
+go 1.21
 
 require (
 	github.com/Azure/go-ntlmssp v0.0.0-20211209120228-48547f28849e
