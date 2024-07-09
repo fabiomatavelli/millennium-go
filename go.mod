@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/Azure/go-ntlmssp v0.0.0-20211209120228-48547f28849e
-	github.com/hashicorp/go-retryablehttp v0.7.5
+	github.com/hashicorp/go-retryablehttp v0.7.7
 )
 
 require (
