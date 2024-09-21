@@ -12,6 +12,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -25,6 +26,7 @@ type AuthType string
 // Authentication types available for Millennium
 const (
 	NTLM    AuthType = "NTLM"
+	Basic   AuthType = "BASIC"
 	Session AuthType = "SESSION"
 )
 
@@ -157,9 +159,7 @@ func (m *Millennium) Login(username string, password string, authType AuthType) 
 		m.Client.HTTPClient.Transport = ntlmssp.Negotiator{
 			RoundTripper: &http.Transport{},
 		}
-	}
-
-	if authType == Session {
+	} else if authType == Session {
 		var responseLogin ResponseLogin
 		m.headers.Set("WTS-Authorization", fmt.Sprintf("%s/%s", strings.ToUpper(m.credentials.Username), strings.ToUpper(m.credentials.Password)))
 		if err := m.Post("login", []byte{}, &responseLogin); err != nil {
@@ -216,6 +216,7 @@ func (m *Millennium) Request(r RequestMethod) (err error) {
 	requestBody := bodyReader
 
 	req, err := retryablehttp.NewRequestWithContext(m.Context, requestMethod, requestURL, requestBody)
+
 	if err != nil {
 		return fmt.Errorf("unable to start new request to Millennium: %w", err)
 	}
@@ -224,8 +225,8 @@ func (m *Millennium) Request(r RequestMethod) (err error) {
 		req.Header = m.headers
 	}
 
-	// If authType is NTLM, set basic auth on request
-	if m.credentials.AuthType == NTLM {
+	// If authType is NTLM or Basic, set basic auth on request
+	if m.credentials.AuthType == NTLM || m.credentials.AuthType == Basic {
 		req.SetBasicAuth(m.credentials.Username, m.credentials.Password)
 	}
 
@@ -241,6 +242,12 @@ func (m *Millennium) sendRequest(request *retryablehttp.Request, response interf
 	res, err := m.Client.Do(request)
 	if err != nil {
 		return fmt.Errorf("unable to send request: %w", err)
+	}
+
+	if !slices.Contains([]int{http.StatusOK, http.StatusNoContent, http.StatusCreated, http.StatusTemporaryRedirect, http.StatusPermanentRedirect}, res.StatusCode) {
+		defer res.Body.Close()
+
+		return fmt.Errorf("unable to send request: %s", res.Status)
 	}
 
 	return m.getResponse(res, &response)

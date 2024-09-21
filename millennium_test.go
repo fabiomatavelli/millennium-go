@@ -151,6 +151,21 @@ func (s *mockHTTPServer) Start() *httptest.Server {
 			Body:       s.jsonError("Query error", http.StatusInternalServerError),
 		})
 	})
+	mux.HandleFunc("/api/test.basicauth", func(w http.ResponseWriter, r *http.Request) {
+		username, password, ok := r.BasicAuth()
+		if !ok || username != "correct_user" || password != "correct_password" {
+			w.Header().Set("WWW-Authenticate", `Basic realm="Restricted"`)
+			http.Error(w, "", http.StatusUnauthorized)
+			return
+		}
+
+		s.writeOutput(&writeOutputParams{
+			Writer:     w,
+			Request:    r,
+			StatusCode: 200,
+			Body:       []byte(`{"odata.count": 1,"value":[{"number":1,"string":"test","bool":true}]}`),
+		})
+	})
 
 	s.testServer = httptest.NewServer(mux)
 	return s.testServer
@@ -291,6 +306,35 @@ func TestNTLM(t *testing.T) {
 	x, err := client.Get("test.success.GET", url.Values{}, &_r)
 	if err != nil {
 		t.Error(err)
+	}
+
+	if x == 0 {
+		t.Error("Zero records returned")
+	}
+}
+
+func TestBasicAuth(t *testing.T) {
+	client := NewTestClient(t)
+	err := client.Login("test", "test", Basic)
+	if err != nil {
+		t.Error(err)
+	}
+
+	var _r interface{}
+
+	_, err = client.Get("test.basicauth", url.Values{}, &_r)
+	if err == nil {
+		t.Error("Expected error")
+	}
+
+	err = client.Login("correct_user", "correct_password", Basic)
+	if err != nil {
+		t.Error(err)
+	}
+
+	x, err := client.Get("test.basicauth", url.Values{}, &_r)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	if x == 0 {
