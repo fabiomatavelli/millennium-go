@@ -12,7 +12,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"slices"
 	"strings"
 	"time"
 
@@ -244,12 +243,6 @@ func (m *Millennium) sendRequest(request *retryablehttp.Request, response interf
 		return fmt.Errorf("unable to send request: %w", err)
 	}
 
-	if !slices.Contains([]int{http.StatusOK, http.StatusNoContent, http.StatusCreated, http.StatusTemporaryRedirect, http.StatusPermanentRedirect}, res.StatusCode) {
-		defer res.Body.Close()
-
-		return fmt.Errorf("unable to send request: %s", res.Status)
-	}
-
 	return m.getResponse(res, &response)
 }
 
@@ -265,7 +258,7 @@ func (m *Millennium) getResponse(res *http.Response, output interface{}) error {
 	if res.StatusCode >= 400 {
 		var resErr ResponseError
 		if err = json.Unmarshal(bodyRes, &resErr); err != nil {
-			return fmt.Errorf("unable to unmarshal error response: %w", err)
+			return fmt.Errorf("got error %d but unable to unmarshal error response: %w", res.StatusCode, err)
 		}
 
 		return &resErr
